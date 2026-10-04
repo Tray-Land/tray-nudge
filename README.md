@@ -13,7 +13,7 @@ It's a WinUI 3 app that lives in the Windows notification area. There's no main 
 - **Today at a glance.** A greeting, a progress ring for the day ("2 of 4 done. You're on your way."), a tip about building habits, and a card for each habit.
 - **One-tap logging.** Each card has a round button. Yes-or-no habits (journal, steps) take one tap. Counted habits (8 glasses of water, 8 stand-ups) take a tap per glass, with a progress bar that fills as you go.
 - **Streaks and regularity.** Every card shows its current streak and the last seven days as dots. Tap a habit's name for its progress page: current and best streak, how many of the last 30 days you showed up, and a 12-week heatmap.
-- **Gentle nudges.** Each habit can remind you every so often within a window (every 90 minutes from 9 AM to 6 PM) or at set times (9 PM). Toasts have **Log one** / **Done** and **Later** (30 minutes) buttons, so you can check in without opening anything. Nudges stop for the day once the goal is met, and interval nudges skip a turn if you've just logged one.
+- **Gentle nudges.** Each habit can remind you every so often within a window (every 90 minutes from 9 AM to 6 PM), hourly at a set minute (every hour at :50, or every 2 hours on the hour), or at set times (9 PM). Toasts have **Log one** / **Done** and **Later** (30 minutes) buttons, so you can check in without opening anything. Nudges stop for the day once the goal is met, and interval and hourly nudges skip a turn if you've just logged one.
 - **Kind by design.**
   - **Never miss twice** (on by default): one missed day doesn't reset a streak, as long as you pick it back up the next day.
   - **Rest days**: mark today as a rest day for any habit. It doesn't count, and it never breaks a streak.
