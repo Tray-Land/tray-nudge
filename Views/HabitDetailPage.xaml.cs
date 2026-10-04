@@ -75,6 +75,8 @@ public sealed partial class HabitDetailPage : Page, IRefreshable
         {
             ReminderMode.Interval =>
                 $"nudges every {FormatInterval(habit.IntervalMinutes)} from {FormatTime(habit.WindowStartMinutes)} to {FormatTime(habit.WindowEndMinutes)}",
+            ReminderMode.Hourly =>
+                $"nudges every {FormatInterval(Math.Clamp(habit.EveryHours, 1, ReminderPlanner.MaxEveryHours) * 60)} at :{Math.Clamp(habit.MinutePastHour, 0, 59):D2} from {FormatTime(habit.WindowStartMinutes)} to {FormatTime(habit.WindowEndMinutes)}",
             ReminderMode.Times when habit.ReminderTimes.Count > 0 =>
                 $"nudges at {string.Join(", ", habit.ReminderTimes.Order().Select(FormatTime))}",
             _ => "no nudges",

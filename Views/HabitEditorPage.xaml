@@ -142,24 +142,57 @@
                         SelectionChanged="ReminderBox_SelectionChanged">
                         <x:String>No nudges</x:String>
                         <x:String>Every so often</x:String>
+                        <x:String>Hourly, at a set minute</x:String>
                         <x:String>At set times</x:String>
                     </ComboBox>
 
-                    <StackPanel x:Name="IntervalPanel" Spacing="10">
-                        <ComboBox
-                            x:Name="IntervalBox"
-                            HorizontalAlignment="Stretch"
-                            Header="How often" />
+                    <ComboBox
+                        x:Name="IntervalBox"
+                        HorizontalAlignment="Stretch"
+                        Header="How often" />
+
+                    <StackPanel x:Name="HourlyPanel" Spacing="6">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox
+                                x:Name="EveryHoursBox"
+                                HorizontalAlignment="Stretch"
+                                Header="How often"
+                                SelectionChanged="EveryHoursBox_SelectionChanged" />
+                            <NumberBox
+                                x:Name="MinuteBox"
+                                Grid.Column="1"
+                                Width="130"
+                                Header="Minutes past"
+                                Maximum="59"
+                                Minimum="0"
+                                SmallChange="5"
+                                SpinButtonPlacementMode="Compact"
+                                ValueChanged="MinuteBox_ValueChanged" />
+                        </Grid>
+                        <TextBlock
+                            x:Name="HourlyHint"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="WindowPanel" Spacing="10">
                         <TimePicker
                             x:Name="FromPicker"
                             HorizontalAlignment="Stretch"
                             Header="Starting at"
-                            MinuteIncrement="15" />
+                            MinuteIncrement="15"
+                            SelectedTimeChanged="WindowPicker_SelectedTimeChanged" />
                         <TimePicker
                             x:Name="UntilPicker"
                             HorizontalAlignment="Stretch"
                             Header="Until"
-                            MinuteIncrement="15" />
+                            MinuteIncrement="15"
+                            SelectedTimeChanged="WindowPicker_SelectedTimeChanged" />
                         <TextBlock
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Style="{StaticResource CaptionTextBlockStyle}"

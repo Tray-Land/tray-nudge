@@ -30,6 +30,18 @@ public sealed partial class HabitEditorPage : Page
         (240, "Every 4 hours"),
     ];
 
+    private static readonly (int Hours, string Label)[] HourSteps =
+    [
+        (1, "Every hour"),
+        (2, "Every 2 hours"),
+        (3, "Every 3 hours"),
+        (4, "Every 4 hours"),
+    ];
+
+    // ReminderBox order, which reads better than the enum's (stored) order.
+    private static readonly ReminderMode[] ReminderModes =
+        [ReminderMode.Off, ReminderMode.Interval, ReminderMode.Hourly, ReminderMode.Times];
+
     private static readonly string[] ColorNames = ["Blue", "Teal", "Green", "Amber", "Orange", "Pink", "Violet", "Indigo"];
 
     private readonly TrayFlyoutWindow _host;
@@ -54,6 +66,11 @@ public sealed partial class HabitEditorPage : Page
         foreach ((_, string label) in Intervals)
         {
             IntervalBox.Items.Add(label);
+        }
+
+        foreach ((_, string label) in HourSteps)
+        {
+            EveryHoursBox.Items.Add(label);
         }
 
         BuildIdeas();
@@ -181,6 +198,8 @@ public sealed partial class HabitEditorPage : Page
         _habit.Days = fresh.Days;
         _habit.Reminder = fresh.Reminder;
         _habit.IntervalMinutes = fresh.IntervalMinutes;
+        _habit.MinutePastHour = fresh.MinutePastHour;
+        _habit.EveryHours = fresh.EveryHours;
         _habit.WindowStartMinutes = fresh.WindowStartMinutes;
         _habit.WindowEndMinutes = fresh.WindowEndMinutes;
         _habit.ReminderTimes = fresh.ReminderTimes;
@@ -201,9 +220,12 @@ public sealed partial class HabitEditorPage : Page
             button.IsChecked = _habit.Days.Includes(day);
         }
 
-        ReminderBox.SelectedIndex = (int)_habit.Reminder;
+        ReminderBox.SelectedIndex = Math.Max(0, Array.IndexOf(ReminderModes, _habit.Reminder));
         int interval = Array.FindIndex(Intervals, i => i.Minutes >= _habit.IntervalMinutes);
         IntervalBox.SelectedIndex = interval < 0 ? Intervals.Length - 1 : interval;
+        int hourStep = Array.FindIndex(HourSteps, h => h.Hours >= _habit.EveryHours);
+        EveryHoursBox.SelectedIndex = hourStep < 0 ? HourSteps.Length - 1 : hourStep;
+        MinuteBox.Value = Math.Clamp(_habit.MinutePastHour, 0, 59);
         FromPicker.Time = TimeSpan.FromMinutes(_habit.WindowStartMinutes);
         UntilPicker.Time = TimeSpan.FromMinutes(_habit.WindowEndMinutes);
 
@@ -257,8 +279,10 @@ public sealed partial class HabitEditorPage : Page
 
     private void UpdateReminderPanels()
     {
-        ReminderMode mode = (ReminderMode)Math.Max(0, ReminderBox.SelectedIndex);
-        IntervalPanel.Visibility = mode == ReminderMode.Interval ? Visibility.Visible : Visibility.Collapsed;
+        ReminderMode mode = SelectedMode();
+        IntervalBox.Visibility = mode == ReminderMode.Interval ? Visibility.Visible : Visibility.Collapsed;
+        HourlyPanel.Visibility = mode == ReminderMode.Hourly ? Visibility.Visible : Visibility.Collapsed;
+        WindowPanel.Visibility = mode is ReminderMode.Interval or ReminderMode.Hourly ? Visibility.Visible : Visibility.Collapsed;
         TimesPanel.Visibility = mode == ReminderMode.Times ? Visibility.Visible : Visibility.Collapsed;
         if (mode == ReminderMode.Times && TimesList.Children.Count == 0 && !_loading)
         {
@@ -266,7 +290,41 @@ public sealed partial class HabitEditorPage : Page
         }
 
         AddTimeButton.IsEnabled = TimesList.Children.Count < MaxTimes;
+        UpdateHourlyHint();
     }
+
+    // Spells out the result ("9:50, 10:50 … 5:50 PM") so the minute field can't be misread.
+    private void UpdateHourlyHint()
+    {
+        // Inputs can fire while InitializeComponent is still building the page.
+        if (_loading || UntilPicker is null || HourlyPanel.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        Habit preview = new()
+        {
+            Reminder = ReminderMode.Hourly,
+            MinutePastHour = SelectedMinute(),
+            EveryHours = HourSteps[Math.Max(0, EveryHoursBox.SelectedIndex)].Hours,
+            WindowStartMinutes = (int)FromPicker.Time.TotalMinutes,
+            WindowEndMinutes = (int)UntilPicker.Time.TotalMinutes,
+        };
+        List<string> times = ReminderPlanner.SlotsFor(preview).Select(FormatTime).ToList();
+        HourlyHint.Text = times.Count switch
+        {
+            0 => "No nudges fit between those times yet. Try a wider window.",
+            <= 4 => $"Nudges at {string.Join(", ", times)}.",
+            _ => $"Nudges at {times[0]}, {times[1]} … {times[^1]}.",
+        };
+    }
+
+    private static string FormatTime(int minutes) =>
+        DateTime.Today.AddMinutes(minutes).ToString("t", CultureInfo.CurrentCulture);
+
+    private ReminderMode SelectedMode() => ReminderModes[Math.Max(0, ReminderBox.SelectedIndex)];
+
+    private int SelectedMinute() => (int)Math.Clamp(double.IsNaN(MinuteBox.Value) ? 0 : MinuteBox.Value, 0, 59);
 
     private void UpdateSaveEnabled() =>
         SaveButton.IsEnabled = !string.IsNullOrWhiteSpace(NameBox.Text) && SelectedDays() != ScheduleDays.None;
@@ -307,8 +365,10 @@ public sealed partial class HabitEditorPage : Page
         _habit.DailyTarget = (int)Math.Clamp(double.IsNaN(TargetBox.Value) ? 1 : TargetBox.Value, 1, 99);
         _habit.Unit = _habit.DailyTarget > 1 ? UnitBox.Text.Trim() : "";
         _habit.Days = SelectedDays();
-        _habit.Reminder = (ReminderMode)Math.Max(0, ReminderBox.SelectedIndex);
+        _habit.Reminder = SelectedMode();
         _habit.IntervalMinutes = Intervals[Math.Max(0, IntervalBox.SelectedIndex)].Minutes;
+        _habit.EveryHours = HourSteps[Math.Max(0, EveryHoursBox.SelectedIndex)].Hours;
+        _habit.MinutePastHour = SelectedMinute();
         _habit.WindowStartMinutes = (int)FromPicker.Time.TotalMinutes;
         _habit.WindowEndMinutes = Math.Max(_habit.WindowStartMinutes, (int)UntilPicker.Time.TotalMinutes);
         _habit.ReminderTimes = TimesList.Children
@@ -377,6 +437,12 @@ public sealed partial class HabitEditorPage : Page
             UpdateReminderPanels();
         }
     }
+
+    private void EveryHoursBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHourlyHint();
+
+    private void MinuteBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args) => UpdateHourlyHint();
+
+    private void WindowPicker_SelectedTimeChanged(TimePicker sender, TimePickerSelectedValueChangedEventArgs args) => UpdateHourlyHint();
 
     private void AddTimeButton_Click(object sender, RoutedEventArgs e)
     {
