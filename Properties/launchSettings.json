@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TrayNudge (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "TrayNudge (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
