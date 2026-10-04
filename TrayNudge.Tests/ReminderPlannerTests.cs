@@ -93,6 +93,57 @@ public sealed class ReminderPlannerTests
         Assert.AreEqual(At(8, 0, 5), ReminderPlanner.NextReminder(habit, At(9, 0, 2)));
     }
 
+    private static Habit Hourly(int minute, int everyHours = 1) => new()
+    {
+        Reminder = ReminderMode.Hourly,
+        MinutePastHour = minute,
+        EveryHours = everyHours,
+        WindowStartMinutes = 9 * 60,
+        WindowEndMinutes = 18 * 60,
+        CreatedOn = Today,
+    };
+
+    [TestMethod]
+    public void HourlySlotsLandOnTheMinuteWithinWindow()
+    {
+        CollectionAssert.AreEqual(
+            new[] { 590, 650, 710, 770, 830, 890, 950, 1010, 1070 },
+            ReminderPlanner.SlotsFor(Hourly(50)).ToArray());
+    }
+
+    [TestMethod]
+    public void HourlySlotsStartAtFirstMinuteAfterWindowStart()
+    {
+        Habit habit = Hourly(15);
+        habit.WindowStartMinutes = 9 * 60 + 30;
+
+        Assert.AreEqual(10 * 60 + 15, ReminderPlanner.SlotsFor(habit)[0]);
+    }
+
+    [TestMethod]
+    public void HourlyCanSkipHours()
+    {
+        CollectionAssert.AreEqual(
+            new[] { 540, 660, 780, 900, 1020 },
+            ReminderPlanner.SlotsFor(Hourly(0, everyHours: 2)).ToArray());
+    }
+
+    [TestMethod]
+    public void NextHourlyNudgeIsAtTheMinute()
+    {
+        Assert.AreEqual(At(10, 50), ReminderPlanner.NextReminder(Hourly(50), At(9, 50)));
+        Assert.AreEqual(At(9, 50, 1), ReminderPlanner.NextReminder(Hourly(50), At(17, 50)));
+    }
+
+    [TestMethod]
+    public void RecentLogSkipsTheNextHourlySlot()
+    {
+        Habit habit = Hourly(50);
+        habit.LastLoggedAt = At(10, 30);
+
+        Assert.AreEqual(At(11, 50), ReminderPlanner.NextReminder(habit, At(10, 31)));
+    }
+
     [TestMethod]
     public void OffHasNoReminder()
     {

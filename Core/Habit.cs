@@ -30,6 +30,12 @@ public enum ReminderMode
 
     /// <summary>At each time in <see cref="Habit.ReminderTimes"/>.</summary>
     Times = 2,
+
+    /// <summary>
+    /// At <see cref="Habit.MinutePastHour"/> past every <see cref="Habit.EveryHours"/> hours within
+    /// the window (9:50, 10:50, 11:50…).
+    /// </summary>
+    Hourly = 3,
 }
 
 /// <summary>
@@ -58,10 +64,16 @@ public sealed class Habit
 
     public int IntervalMinutes { get; set; } = 60;
 
-    /// <summary>Start of the interval window, in minutes after midnight.</summary>
+    /// <summary>Minute of the hour to nudge at, for <see cref="ReminderMode.Hourly"/>.</summary>
+    public int MinutePastHour { get; set; }
+
+    /// <summary>Hours between nudges, for <see cref="ReminderMode.Hourly"/>.</summary>
+    public int EveryHours { get; set; } = 1;
+
+    /// <summary>Start of the interval or hourly window, in minutes after midnight.</summary>
     public int WindowStartMinutes { get; set; } = 9 * 60;
 
-    /// <summary>End of the interval window (inclusive), in minutes after midnight.</summary>
+    /// <summary>End of the interval or hourly window (inclusive), in minutes after midnight.</summary>
     public int WindowEndMinutes { get; set; } = 18 * 60;
 
     /// <summary>Reminder times in minutes after midnight, for <see cref="ReminderMode.Times"/>.</summary>

@@ -3,13 +3,14 @@ namespace TrayNudge.Core;
 /// <summary>
 /// Works out when each habit should nudge next, so the app can sleep on a single timer until then
 /// instead of polling. Nudges never fire on unscheduled or rest days, or once today's target is met.
-/// Interval nudges also skip a slot when the person logged within the last half interval: they're
+/// Interval and hourly nudges also skip a slot when the person logged within the last half interval: they're
 /// already on it.
 /// </summary>
 public static class ReminderPlanner
 {
     public const int MinIntervalMinutes = 15;
     public const int MaxIntervalMinutes = 8 * 60;
+    public const int MaxEveryHours = 4;
 
     /// <summary>A nudge that comes due while the PC slept is only shown if it's at most this old.</summary>
     public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(10);
@@ -32,6 +33,24 @@ public static class ReminderPlanner
                 }
 
                 return slots;
+
+            case ReminderMode.Hourly:
+                int minute = Math.Clamp(habit.MinutePastHour, 0, 59);
+                int windowStart = Math.Clamp(habit.WindowStartMinutes, 0, 1439);
+                int windowEnd = Math.Clamp(habit.WindowEndMinutes, windowStart, 1439);
+                int first = (windowStart / 60 * 60) + minute;
+                if (first < windowStart)
+                {
+                    first += 60;
+                }
+
+                List<int> hourly = [];
+                for (int m = first; m <= windowEnd; m += HourlyStep(habit))
+                {
+                    hourly.Add(m);
+                }
+
+                return hourly;
 
             case ReminderMode.Times:
                 return habit.ReminderTimes.Select(t => Math.Clamp(t, 0, 1439)).Distinct().Order().ToList();
@@ -131,14 +150,21 @@ public static class ReminderPlanner
 
     private static bool LoggedRecently(Habit habit, DateTime slot)
     {
-        if (habit.Reminder != ReminderMode.Interval || habit.LastLoggedAt is not { } logged)
+        int step = habit.Reminder switch
+        {
+            ReminderMode.Interval => Math.Clamp(habit.IntervalMinutes, MinIntervalMinutes, MaxIntervalMinutes),
+            ReminderMode.Hourly => HourlyStep(habit),
+            _ => 0,
+        };
+        if (step == 0 || habit.LastLoggedAt is not { } logged)
         {
             return false;
         }
 
-        double halfInterval = Math.Clamp(habit.IntervalMinutes, MinIntervalMinutes, MaxIntervalMinutes) / 2.0;
-        return logged <= slot && slot - logged < TimeSpan.FromMinutes(halfInterval);
+        return logged <= slot && slot - logged < TimeSpan.FromMinutes(step / 2.0);
     }
+
+    private static int HourlyStep(Habit habit) => Math.Clamp(habit.EveryHours, 1, MaxEveryHours) * 60;
 
     private static DateTime? Earliest(DateTime? a, DateTime? b) =>
         a is null ? b : b is null ? a : a < b ? a : b;
