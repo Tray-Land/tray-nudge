@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using TrayNudge.Controls;
 using TrayNudge.Services;
@@ -24,8 +25,8 @@ namespace TrayNudge.Views;
 /// </summary>
 public sealed partial class TrayFlyoutWindow : WindowEx
 {
-    private const int PopupWidth = 360;
-    private const int PopupHeight = 480;
+    private const int PopupWidth = 380;
+    private const int PopupHeight = 600;
 
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_LAYERED = 0x00080000;
@@ -46,7 +47,8 @@ public sealed partial class TrayFlyoutWindow : WindowEx
     private static readonly TimeSpan CloseDelay = TimeSpan.FromMinutes(1);
 
     private readonly HWND _hwnd;
-    private readonly FlyoutPage _page = new();
+    private readonly FlyoutPage _page;
+    private readonly Stack<UIElement> _backStack = new();
     private readonly ShellBackdrop _backdrop = new();
     private readonly UISettings _uiSettings = new();
     private readonly DispatcherQueueTimer _hideTimer;
@@ -78,6 +80,7 @@ public sealed partial class TrayFlyoutWindow : WindowEx
     {
         InitializeComponent();
         _hwnd = (HWND)WindowNative.GetWindowHandle(this);
+        _page = new FlyoutPage(this);
         PageHost.Content = _page;
 
         SystemBackdrop = _backdrop;
@@ -106,6 +109,15 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _animationTimer.Tick += AnimationTimer_Tick;
     }
 
+    public bool IsPopupVisible => _isPopupVisible;
+
+    public FlyoutPage MainPage => _page;
+
+    /// <summary>Full-window canvas above every page, for confetti.</summary>
+    public Canvas Celebrations => CelebrationLayer;
+
+    private bool IsOnMainPage => ReferenceEquals(PageHost.Content, _page);
+
     /// <summary>Shows the popup, or hides it if already visible (tray-icon click behavior).</summary>
     public void Toggle()
     {
@@ -120,7 +132,70 @@ public sealed partial class TrayFlyoutWindow : WindowEx
             return;
         }
 
+        // A tray click always lands on Today; menu entry points pick their own page.
+        ShowMainPage();
         ShowPopup();
+    }
+
+    /// <summary>Drills into a sub-page; Back (or Escape) returns to the page before it.</summary>
+    public void Navigate(UIElement page)
+    {
+        if (PageHost.Content is UIElement current)
+        {
+            _backStack.Push(current);
+        }
+
+        if (IsOnMainPage)
+        {
+            _page.OnHidden();
+        }
+
+        PageHost.Content = page;
+    }
+
+    public void GoBack()
+    {
+        if (_backStack.Count == 0)
+        {
+            ShowMainPage();
+            return;
+        }
+
+        UIElement previous = _backStack.Pop();
+        PageHost.Content = previous;
+        if (previous == _page && _isPopupVisible)
+        {
+            _page.OnShown();
+        }
+        else if (previous is IRefreshable refreshable)
+        {
+            refreshable.Refresh();
+        }
+    }
+
+    public void ShowMainPage()
+    {
+        _backStack.Clear();
+        if (!IsOnMainPage)
+        {
+            PageHost.Content = _page;
+            if (_isPopupVisible)
+            {
+                _page.OnShown();
+            }
+        }
+    }
+
+    public void ShowSettingsPage()
+    {
+        ShowMainPage();
+        Navigate(new SettingsPage(this));
+    }
+
+    public void ShowNewHabitPage()
+    {
+        ShowMainPage();
+        Navigate(new HabitEditorPage(this, null));
     }
 
     public void ShowPopup()
@@ -143,7 +218,10 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         Activate();
         PInvoke.SetForegroundWindow(_hwnd);
 
-        _page.OnShown();
+        if (IsOnMainPage)
+        {
+            _page.OnShown();
+        }
     }
 
     public void HidePopup()
@@ -159,6 +237,7 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _isPopupVisible = false;
         _lastDismissedAtUtc = DateTime.UtcNow;
         _page.OnHidden();
+        CelebrationLayer.Children.Clear();
         PlayHideAnimation();
 
         _closeTimer.Stop();
@@ -182,6 +261,9 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _animationTimer.Stop();
         _page.OnHidden();
         _page.Dispose();
+        _backStack.Clear();
+        PageHost.Content = null;
+        CelebrationLayer.Children.Clear();
 
         _uiSettings.ColorValuesChanged -= OnColorValuesChanged;
         Activated -= OnWindowActivated;
@@ -360,9 +442,35 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         return className.SequenceEqual("Xaml_WindowedPopupClass") || className.SequenceEqual("#32768");
     }
 
+    // Escape goes back first and hides second.
     private void Escape_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        HidePopup();
+        if (IsOnMainPage)
+        {
+            HidePopup();
+        }
+        else
+        {
+            GoBack();
+        }
+    }
+
+    private void Back_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        if (!IsOnMainPage)
+        {
+            GoBack();
+        }
+    }
+
+    private void PopupRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (!IsOnMainPage && e.GetCurrentPoint(PopupRoot).Properties.IsXButton1Pressed)
+        {
+            e.Handled = true;
+            GoBack();
+        }
     }
 }

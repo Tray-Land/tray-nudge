@@ -1,6 +1,9 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.AppLifecycle;
+using Microsoft.Windows.AppNotifications;
+using TrayNudge.Core;
 using TrayNudge.Services;
 using TrayNudge.Views;
 using WinUIEx;
@@ -9,7 +12,8 @@ namespace TrayNudge;
 
 /// <summary>
 /// Tray-only application: no window at launch, just a notification-area icon that toggles the
-/// flyout. Windows exist only while they're in use; the idle app is an icon and little else.
+/// flyout. Windows exist only while they're in use; the idle app is an icon, the habit list, and
+/// one reminder timer.
 /// </summary>
 public partial class App : Application
 {
@@ -22,12 +26,14 @@ public partial class App : Application
     // Startup leaves JIT and first-request state behind that the idle app never touches again.
     private static readonly TimeSpan StartupTrimDelay = TimeSpan.FromSeconds(30);
 
+    private static readonly TimeSpan MenuPauseLength = TimeSpan.FromHours(1);
+
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showEvent;
     private RegisteredWaitHandle? _showWait;
     private TrayIcon? _trayIcon;
     private TrayFlyoutWindow? _flyout;
-    private SettingsWindow? _settings;
+    private ReminderService? _reminders;
     private DispatcherQueue? _dispatcher;
     private bool _isExiting;
 
@@ -42,6 +48,9 @@ public partial class App : Application
     }
 
     public static new App Current => (App)Application.Current;
+
+    /// <summary>Null only before launch finishes.</summary>
+    internal ReminderService? Reminders => _reminders;
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -72,11 +81,24 @@ public partial class App : Application
         _showWait = ThreadPool.RegisterWaitForSingleObject(_showEvent,
             (_, _) => _dispatcher.TryEnqueue(ShowFlyout), null, Timeout.Infinite, executeOnlyOnce: false);
 
+        HabitStore.Load();
         InitializeTrayIcon();
 
-        // First run: show where the app lives instead of launching into silence.
-        if (!SettingsService.HasLaunchedBefore)
+        NotificationService.Invoked += (_, e) => _dispatcher.TryEnqueue(() => HandleNudgeAction(e.Action, e.HabitId));
+        NotificationService.Register();
+        _reminders = new ReminderService(_dispatcher);
+        _reminders.Start();
+
+        if (TryGetLaunchNotification() is { } launch)
         {
+            // Started by a toast click while the app wasn't running: just do what was asked.
+            SettingsService.HasLaunchedBefore = true;
+            HandleNudgeAction(launch.Action, launch.HabitId);
+            MemoryService.ReleaseIdle(StartupTrimDelay);
+        }
+        else if (!SettingsService.HasLaunchedBefore)
+        {
+            // First run: show where the app lives instead of launching into silence.
             SettingsService.HasLaunchedBefore = true;
             ShowFlyout();
         }
@@ -86,7 +108,7 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Sets the tray tooltip under the app name, e.g. "3 new" or null for just the name.</summary>
+    /// <summary>Sets the tray tooltip under the app name, e.g. "2 of 4 done today".</summary>
     public void SetTrayStatus(string? status)
     {
         if (_trayIcon is null)
@@ -102,24 +124,75 @@ public partial class App : Application
     {
         TrayFlyoutWindow flyout = EnsureFlyout();
         flyout.HidePopup();
+        flyout.ShowMainPage();
         flyout.ShowPopup();
     }
 
-    public void ShowSettings()
+    /// <summary>Shows the flyout on its settings page.</summary>
+    public void ShowSettings() => ShowFlyoutOn(f => f.ShowSettingsPage());
+
+    private void ShowFlyoutOn(Action<TrayFlyoutWindow> navigate)
     {
-        _flyout?.HidePopup();
-        if (_settings is null)
+        TrayFlyoutWindow flyout = EnsureFlyout();
+        navigate(flyout);
+        if (!flyout.IsPopupVisible)
         {
-            _settings = new SettingsWindow();
-            _settings.Closed += (_, _) =>
+            flyout.ShowPopup();
+        }
+    }
+
+    /// <summary>Acts on a toast click: log from the toast, snooze, or open the flyout.</summary>
+    private void HandleNudgeAction(NudgeAction action, string? habitId)
+    {
+        switch (action)
+        {
+            case NudgeAction.Log when habitId is not null:
+                if (HabitStore.Log(habitId, 1) is { } result)
+                {
+                    ConfirmLoggedFromToast(result);
+                }
+
+                break;
+            case NudgeAction.Snooze when habitId is not null:
+                _reminders?.Snooze(habitId);
+                break;
+            default:
+                ShowFlyout();
+                break;
+        }
+    }
+
+    private static void ConfirmLoggedFromToast(LogResult result)
+    {
+        Habit habit = result.Habit;
+        if (result.BecameMet)
+        {
+            (string title, string message) = Encouragement.GoalMet(habit, result.Streak, Random.Shared.Next());
+            NotificationService.ShowLogged(habit, $"{habit.Emoji} {title} 🎉", message);
+        }
+        else
+        {
+            NotificationService.ShowLogged(habit, $"{habit.Emoji} Logged", Encouragement.ProgressText(habit, result.Count) + ". Nice pace.");
+        }
+    }
+
+    private static (NudgeAction Action, string? HabitId)? TryGetLaunchNotification()
+    {
+        try
+        {
+            AppActivationArguments activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+            if (activation.Kind == ExtendedActivationKind.AppNotification
+                && activation.Data is AppNotificationActivatedEventArgs toast)
             {
-                _settings = null;
-                ReleaseIdleResourcesIfNoWindows();
-            };
+                return NotificationService.Parse(toast.Arguments);
+            }
+        }
+        catch
+        {
+            // Unpackaged or unusual activation: treat as a normal launch.
         }
 
-        _settings.Activate();
-        _settings.BringToFront();
+        return null;
     }
 
     private void InitializeTrayIcon()
@@ -141,13 +214,37 @@ public partial class App : Application
         MenuFlyout menu = new();
         MenuFlyoutItem open = new() { Text = $"Open {DisplayName}", Icon = new FontIcon { Glyph = "" } };
         open.Click += (_, _) => ShowFlyout();
+        menu.Items.Add(open);
+
+        MenuFlyoutItem add = new() { Text = "Add a habit", Icon = new FontIcon { Glyph = "" } };
+        add.Click += (_, _) => ShowFlyoutOn(f => f.ShowNewHabitPage());
+        menu.Items.Add(add);
+
+        if (_reminders is { } reminders && SettingsService.RemindersEnabled && HabitStore.Habits.Count > 0)
+        {
+            MenuFlyoutItem pause = reminders.IsPaused
+                ? new() { Text = "Resume nudges", Icon = new FontIcon { Glyph = "" } }
+                : new() { Text = "Pause nudges for an hour", Icon = new FontIcon { Glyph = "" } };
+            pause.Click += (_, _) =>
+            {
+                if (reminders.IsPaused)
+                {
+                    reminders.Resume();
+                }
+                else
+                {
+                    reminders.PauseFor(MenuPauseLength);
+                }
+            };
+            menu.Items.Add(pause);
+        }
+
         MenuFlyoutItem settings = new() { Text = "Settings", Icon = new FontIcon { Glyph = "" } };
         settings.Click += (_, _) => ShowSettings();
-        MenuFlyoutItem exit = new() { Text = "Exit", Icon = new FontIcon { Glyph = "" } };
-        exit.Click += (_, _) => ExitApp();
-
-        menu.Items.Add(open);
         menu.Items.Add(settings);
+
+        MenuFlyoutItem exit = new() { Text = "Exit", Icon = new FontIcon { Glyph = "" } };
+        exit.Click += (_, _) => ExitApp();
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(exit);
         args.Flyout = menu;
@@ -171,7 +268,7 @@ public partial class App : Application
 
     private void ReleaseIdleResourcesIfNoWindows()
     {
-        if (_flyout is null && _settings is null && !_isExiting)
+        if (_flyout is null && !_isExiting)
         {
             MemoryService.ReleaseIdle();
         }
@@ -181,7 +278,8 @@ public partial class App : Application
     {
         _isExiting = true;
         _flyout?.CloseWindow();
-        _settings?.Close();
+        _reminders?.Dispose();
+        NotificationService.Unregister();
 
         if (_trayIcon is not null)
         {

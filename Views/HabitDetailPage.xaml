@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="TrayNudge.Views.HabitDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Page.Resources>
+        <Style x:Key="StatTileStyle" TargetType="Grid">
+            <Setter Property="Padding" Value="10,10" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Padding="12,12,8,12" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  Theme probes for code-built cells, resolved in the flyout's theme  -->
+        <TextBlock
+            x:Name="FaintProbe"
+            Foreground="{ThemeResource ControlStrongStrokeColorDefaultBrush}"
+            Visibility="Collapsed" />
+        <TextBlock
+            x:Name="StrongProbe"
+            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+            Visibility="Collapsed" />
+        <TextBlock
+            x:Name="TertiaryProbe"
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+            Visibility="Collapsed" />
+
+        <Grid ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                AutomationProperties.Name="Back"
+                Click="BackButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Back">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <TextBlock
+                x:Name="TitleText"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                TextTrimming="CharacterEllipsis" />
+            <Button
+                Grid.Column="2"
+                AutomationProperties.Name="Edit habit"
+                Click="EditButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Edit habit">
+                <FontIcon FontSize="14" Glyph="&#xE70F;" />
+            </Button>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Padding="4,0,12,0">
+            <StackPanel Padding="0,4,0,12" Spacing="16">
+
+                <!--  The three numbers that matter  -->
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid x:Name="CurrentTile" Style="{StaticResource StatTileStyle}">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="CurrentValue" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Current streak" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid Grid.Column="1" Style="{StaticResource StatTileStyle}">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="BestValue" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Best streak" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid Grid.Column="2" Style="{StaticResource StatTileStyle}">
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="ConsistencyValue" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Last 30 days" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <TextBlock x:Name="ConsistencyText" TextWrapping="Wrap" />
+
+                <!--  Twelve weeks at a glance  -->
+                <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Last 12 weeks" />
+                    <Grid x:Name="HeatGrid" HorizontalAlignment="Left" />
+                    <StackPanel x:Name="Legend" Orientation="Horizontal" Spacing="12" />
+                </StackPanel>
+
+                <TextBlock
+                    x:Name="ScheduleText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="RestButton" Click="RestButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="12" Glyph="&#xE708;" />
+                            <TextBlock x:Name="RestLabel" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="UndoButton" Click="UndoButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="12" Glyph="&#xE7A7;" />
+                            <TextBlock x:Name="UndoLabel" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="Rest days are for when life happens. They don't count, and they never break a streak."
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

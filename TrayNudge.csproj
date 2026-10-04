@@ -29,6 +29,10 @@
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Assets\AppIcon-dark.ico" />
     <Content Remove="branding\**" />
+    <!-- The test project lives inside this folder; keep its sources out of the app. -->
+    <Compile Remove="TrayNudge.Tests\**" />
+    <None Remove="TrayNudge.Tests\**" />
+    <Content Remove="TrayNudge.Tests\**" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />

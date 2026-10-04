@@ -5,37 +5,42 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
-    <Grid Padding="16,12,12,16" RowSpacing="12">
+    <Grid Padding="16,12,12,10" RowSpacing="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!--  Header  -->
+        <!--  Header: a greeting, not a title  -->
         <Grid ColumnSpacing="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock
-                x:Name="TitleText"
-                VerticalAlignment="Center"
-                Style="{StaticResource SubtitleTextBlockStyle}"
-                Text="Tray Nudge" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="GreetingText" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock
+                    x:Name="DateText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}" />
+            </StackPanel>
             <Button
-                x:Name="RefreshButton"
+                x:Name="AddButton"
                 Grid.Column="1"
-                AutomationProperties.Name="Refresh"
-                Click="RefreshButton_Click"
+                VerticalAlignment="Top"
+                AutomationProperties.Name="Add a habit"
+                Click="AddButton_Click"
                 Style="{StaticResource FlyoutIconButtonStyle}"
-                ToolTipService.ToolTip="Refresh">
-                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                ToolTipService.ToolTip="Add a habit">
+                <FontIcon FontSize="14" Glyph="&#xE710;" />
             </Button>
             <Button
                 Grid.Column="2"
+                VerticalAlignment="Top"
                 AutomationProperties.Name="Settings"
                 Click="SettingsButton_Click"
                 Style="{StaticResource FlyoutIconButtonStyle}"
@@ -44,48 +49,152 @@
             </Button>
         </Grid>
 
-        <!--  Errors keep the last good content visible underneath  -->
-        <InfoBar
-            x:Name="StatusBar"
+        <!--  Today at a glance  -->
+        <Grid
+            x:Name="SummaryCard"
             Grid.Row="1"
-            IsClosable="False"
-            IsOpen="False"
-            Severity="Warning" />
-
-        <!--  Content: replace with the app's own view  -->
-        <Border
-            Grid.Row="2"
-            Padding="16"
+            Margin="0,0,4,0"
+            Padding="14,12"
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
+            ColumnSpacing="14"
             CornerRadius="8">
-            <StackPanel VerticalAlignment="Center" Spacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Width="56" Height="56">
+                <ProgressRing
+                    x:Name="DayRing"
+                    Width="56"
+                    Height="56"
+                    Background="{ThemeResource ControlStrongStrokeColorDisabledBrush}"
+                    IsIndeterminate="False"
+                    Maximum="100"
+                    Value="0" />
                 <TextBlock
-                    x:Name="ValueText"
+                    x:Name="DayRingText"
                     HorizontalAlignment="Center"
-                    Style="{StaticResource TitleLargeTextBlockStyle}"
-                    Text="--" />
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold" />
+            </Grid>
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Spacing="2">
                 <TextBlock
-                    HorizontalAlignment="Center"
+                    x:Name="SummaryText"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    x:Name="TipText"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="Replace this card with the app's content." />
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap" />
             </StackPanel>
-        </Border>
+        </Grid>
 
-        <!--  Footer  -->
-        <Grid Grid.Row="3">
+        <!--  A celebration that slides in and drifts away on its own  -->
+        <Grid
+            x:Name="Banner"
+            Grid.Row="2"
+            Margin="0,0,4,0"
+            Padding="14,10"
+            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            ColumnSpacing="12"
+            CornerRadius="8"
+            Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <TextBlock
-                x:Name="UpdatedText"
+                x:Name="BannerEmoji"
+                VerticalAlignment="Center"
+                FontSize="24" />
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                AutomationProperties.LiveSetting="Polite">
+                <TextBlock
+                    x:Name="BannerTitle"
+                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    x:Name="BannerMessage"
+                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+
+        <!--  Habits  -->
+        <ScrollViewer
+            x:Name="ListScroller"
+            Grid.Row="3"
+            Padding="0,0,4,0">
+            <StackPanel x:Name="HabitList" Spacing="8">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition FromVerticalOffset="28" IsStaggeringEnabled="True" />
+                        <RepositionThemeTransition />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!--  First run: one clear, friendly next step  -->
+        <StackPanel
+            x:Name="EmptyState"
+            Grid.Row="3"
+            Margin="12,0,16,24"
+            VerticalAlignment="Center"
+            Spacing="10"
+            Visibility="Collapsed">
+            <TextBlock
+                x:Name="EmptySprout"
+                HorizontalAlignment="Center"
+                FontSize="52"
+                Text="🌱" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="Small steps, lasting change"
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Pick one tiny habit to begin. Tray Nudge will remind you gently and cheer you on. You can always add more later."
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+            <Button
+                x:Name="FirstHabitButton"
+                Margin="0,6,0,0"
+                HorizontalAlignment="Center"
+                Click="AddButton_Click"
+                Content="Choose your first habit"
+                Style="{StaticResource AccentButtonStyle}" />
+        </StackPanel>
+
+        <!--  Footer: when the next nudge comes  -->
+        <StackPanel
+            Grid.Row="4"
+            Orientation="Horizontal"
+            Spacing="6">
+            <FontIcon
+                x:Name="FooterIcon"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                Glyph="&#xEA8F;" />
+            <TextBlock
+                x:Name="FooterText"
                 VerticalAlignment="Center"
                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}" />
-            <ProgressRing
-                x:Name="LoadingRing"
-                Width="16"
-                Height="16"
-                HorizontalAlignment="Right"
-                IsActive="False" />
-        </Grid>
+        </StackPanel>
     </Grid>
 </Page>

@@ -6,8 +6,8 @@ namespace TrayNudge.Services;
 
 /// <summary>
 /// Typed wrapper over <see cref="ApplicationData.LocalSettings"/>. Every read falls back to a
-/// default so a missing or corrupt value never crashes the app. Not for secrets: see
-/// <see cref="Secrets"/> (build-time app keys) and <see cref="CredentialStore"/> (user tokens).
+/// default so a missing or corrupt value never crashes the app. Habits and their history live in
+/// <see cref="HabitStore"/>, not here.
 /// </summary>
 /// <remarks>
 /// LocalSettings values must be small (8 KB each) WinRT primitives. Store enums as int, and lists
@@ -23,6 +23,44 @@ internal static class SettingsService
         get => Get(nameof(HasLaunchedBefore), false);
         set => Set(nameof(HasLaunchedBefore), value);
     }
+
+    /// <summary>Master switch for reminder toasts.</summary>
+    public static bool RemindersEnabled
+    {
+        get => Get(nameof(RemindersEnabled), true);
+        set => Set(nameof(RemindersEnabled), value);
+    }
+
+    /// <summary>Nudges stay quiet until this time ("Pause for an hour"); null when not paused.</summary>
+    public static DateTime? RemindersPausedUntil
+    {
+        get
+        {
+            long ticks = Get(nameof(RemindersPausedUntil), 0L);
+            return ticks > 0 && ticks <= DateTime.MaxValue.Ticks ? new DateTime(ticks, DateTimeKind.Local) : null;
+        }
+
+        set => Set(nameof(RemindersPausedUntil), value?.Ticks);
+    }
+
+    /// <summary>"Never miss twice": one missed day doesn't reset a streak.</summary>
+    public static bool GentleStreaks
+    {
+        get => Get(nameof(GentleStreaks), true);
+        set => Set(nameof(GentleStreaks), value);
+    }
+
+    /// <summary>Confetti and bounces. Also off when Windows animation effects are off.</summary>
+    public static bool Celebrations
+    {
+        get => Get(nameof(Celebrations), true);
+        set => Set(nameof(Celebrations), value);
+    }
+
+    /// <summary>Raised on the UI thread when a setting that affects display or reminders changes.</summary>
+    public static event EventHandler? Changed;
+
+    public static void RaiseChanged() => Changed?.Invoke(null, EventArgs.Empty);
 
     public static T? GetJson<T>(string key, JsonTypeInfo<T> typeInfo)
     {
