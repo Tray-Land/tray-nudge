@@ -49,6 +49,18 @@ public sealed class EncouragementAndDataTests
     }
 
     [TestMethod]
+    public void DigestNamesEveryHabitGently()
+    {
+        List<Habit> habits = [new() { Name = "Water", Emoji = "💧" }, new() { Name = "Stretch", Emoji = "🧘" }];
+        (string title, string message) = Encouragement.DigestNudge(habits);
+
+        StringAssert.Contains(title, "2");
+        StringAssert.Contains(message, "Water");
+        StringAssert.Contains(message, "Stretch");
+        Assert.IsFalse((title + message).Contains('!'));
+    }
+
+    [TestMethod]
     public void NoWordingScolds()
     {
         string[] harsh = ["fail", "broke", "lost", "oops", "should have", "!"];

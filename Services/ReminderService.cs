@@ -109,8 +109,16 @@ internal sealed class ReminderService : IDisposable
 
         if (IsActive && !IsPaused)
         {
-            foreach (Habit habit in ReminderPlanner.DueBetween(HabitStore.Habits, _lastCheck, now, _snoozes))
+            IReadOnlyList<Habit> due = ReminderPlanner.DueBetween(HabitStore.Habits, _lastCheck, now, _snoozes);
+            if (due.Count > 1)
             {
+                // Several at once: one combined toast instead of a stack.
+                (string title, string message) = Encouragement.DigestNudge(due);
+                NotificationService.ShowDigest(due, title, message);
+            }
+            else if (due.Count == 1)
+            {
+                Habit habit = due[0];
                 StreakInfo streak = HabitStore.StreakFor(habit);
                 (string title, string message) = Encouragement.Nudge(habit, habit.CountOn(today), streak.Current, Random.Shared.Next());
                 NotificationService.ShowNudge(habit, title, message);

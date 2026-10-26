@@ -21,6 +21,7 @@ internal static class NotificationService
     private const string ActionKey = "action";
     private const string HabitKey = "habit";
     private const string Group = "nudges";
+    private const string DigestTag = "digest";
 
     private static bool _registered;
 
@@ -82,6 +83,30 @@ internal static class NotificationService
                 .AddArgument(HabitKey, habit.Id))
             .BuildNotification();
         Show(notification, habit.Id);
+    }
+
+    /// <summary>
+    /// One toast standing in for several habits due together. It replaces the per-habit toasts, and
+    /// tapping it opens the flyout where each can be logged.
+    /// </summary>
+    public static void ShowDigest(IReadOnlyList<Habit> habits, string title, string message)
+    {
+        if (!_registered)
+        {
+            return;
+        }
+
+        foreach (Habit habit in habits)
+        {
+            Remove(habit.Id);
+        }
+
+        AppNotification notification = new AppNotificationBuilder()
+            .AddArgument(ActionKey, nameof(NudgeAction.Open))
+            .AddText(title)
+            .AddText(message)
+            .BuildNotification();
+        Show(notification, DigestTag);
     }
 
     /// <summary>A quiet confirmation after logging from a toast, replacing the nudge.</summary>

@@ -181,6 +181,10 @@ public static class Encouragement
         return (title, message);
     }
 
+    /// <summary>One toast for several habits that came due together, so they don't pile up.</summary>
+    public static (string Title, string Message) DigestNudge(IReadOnlyList<Habit> habits) =>
+        ($"🌿 {habits.Count} gentle nudges", string.Join("  ", habits.Select(h => $"{h.Emoji} {h.Name}")));
+
     public static string AllDoneCelebration(int pick) => Mod(pick, 3) switch
     {
         0 => "Everything's done today. Take a moment to feel good about that.",
